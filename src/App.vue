@@ -7,8 +7,8 @@ import type { ClientResource, Resources } from '@clerk/types'
 export default defineComponent({
   data() {
     return {
+      isLoading: false,
       clerk: null as HeadlessBrowserClerk | BrowserClerk | null,
-      isAuthenticated: false,
       resources: {
         client: {} as ClientResource,
         session: undefined,
@@ -22,9 +22,13 @@ export default defineComponent({
   },
   methods: {
     async loadClerk() {
+      this.isLoading = true
+
       await loadClerkJsScript({
         publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
       })
+
+      this.isLoading = false
 
       if (!window.Clerk) {
         throw new Error('Clerk script failed to load');
@@ -33,15 +37,16 @@ export default defineComponent({
       this.clerk = window.Clerk
       await this.clerk.load()
 
-      if (this.clerk.user) {
-        this.isAuthenticated = true
-      } else {
+      if (!this.clerk.user) {
         this.clerk.mountSignIn(this.$refs.signIn as HTMLDivElement)
       }
 
       this.clerk.addListener((payload) => {
         this.resources = payload;
       });
+    },
+    async signOut() {
+      await this.clerk?.signOut()
     }
   }
 })
@@ -49,11 +54,11 @@ export default defineComponent({
 
 <template>
   <div>
-    <div v-if="isAuthenticated">
+    <div v-if="isLoading">Loading Clerk...</div>
+    <div v-else-if="resources.user">
       <p>Signed in as {{ resources.user?.id }}</p>
+      <button @click="signOut">Sign out</button>
     </div>
-    <div v-else>
-      <div ref="signIn"></div>
-    </div>
+    <div v-else ref="signIn"></div>
   </div>
 </template>
